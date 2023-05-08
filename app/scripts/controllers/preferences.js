@@ -3,7 +3,7 @@ import { normalize as normalizeAddress } from 'eth-sig-util';
 import { IPFS_DEFAULT_GATEWAY_URL } from '../../../shared/constants/network';
 import { LedgerTransportTypes } from '../../../shared/constants/hardware-wallets';
 import { ThemeType } from '../../../shared/constants/preferences';
-
+import log from 'loglevel';
 export default class PreferencesController {
   /**
    *
@@ -28,6 +28,8 @@ export default class PreferencesController {
       dismissSeedBackUpReminder: false,
       disabledRpcMethodPreferences: {
         eth_sign: false,
+      },
+      lockedAssets: {
       },
       useMultiAccountBalanceChecker: true,
 
@@ -499,6 +501,39 @@ export default class PreferencesController {
     this.store.updateState({
       disabledRpcMethodPreferences: updatedRpcMethodPreferences,
     });
+  }
+
+  async lockAsset(assetToLock) {
+    console.log("Locking Asset")
+    const { tokenAddress, setLocked, tokenId, tokenStandard, chainId } = assetToLock;
+    const lockedAssetIdentifier = this._lockedAssetIdentifier({
+      tokenStandard,
+      tokenAddress,
+      tokenId,
+      chainId
+    });
+
+    const { lockedAssets, selectedAddress } = this.store.getState();
+
+    const updatedLockedAssets = {
+      ...lockedAssets,
+      [selectedAddress]: {
+        [lockedAssetIdentifier]: setLocked,
+      },
+    };
+
+    console.log("Locked state is now, ", updatedLockedAssets)
+
+    this.store.updateState({
+      lockedAssets: updatedLockedAssets,
+    });
+  }
+
+  // @ellul TODO MISSING FUNCTION ANNOTATION
+  // MOVE DOWN TO PRIVATE LATER
+  // ********
+  _lockedAssetIdentifier({ tokenStandard, tokenAddress, tokenId, chainId, eip = 'eip155' },) {
+    return `${eip}:${chainId}/${tokenStandard}:${tokenAddress}/${tokenId}`;
   }
 
   getRpcMethodPreferences() {

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useDispatch, useSelector } from 'react-redux';
 import { useHistory } from 'react-router-dom';
@@ -27,6 +27,7 @@ import {
   getCurrentChainId,
   getIpfsGateway,
   getSelectedIdentity,
+  getAssetLockedStatus,
 } from '../../../selectors';
 import AssetNavigation from '../../../pages/asset/components/asset-navigation';
 import { getNftContracts } from '../../../ducks/metamask/metamask';
@@ -36,6 +37,7 @@ import {
   removeAndIgnoreNft,
   setRemoveNftMessage,
   setNewNftAddedMessage,
+  setAssetLock,
 } from '../../../store/actions';
 import { CHAIN_IDS } from '../../../../shared/constants/network';
 import { getEnvironmentType } from '../../../../app/scripts/lib/util';
@@ -75,6 +77,18 @@ export default function NftDetails({ nft }) {
   const ipfsGateway = useSelector(getIpfsGateway);
   const nftContracts = useSelector(getNftContracts);
   const currentNetwork = useSelector(getCurrentChainId);
+
+  // @ellul PULL OUT THE ID GENERATING LOGIC INTO A SHARED FUNCTION
+  const isLockedAsset = useSelector((state) => {
+    debugger;
+
+    const assetIdentifier = `eip155:${currentNetwork}/${standard}:${address}/${tokenId}`;
+
+    const { lockedAssets, selectedAddress } = state.metamask;
+
+    return Boolean(lockedAssets?.[selectedAddress]?.[assetIdentifier]);
+  });
+
   const [addressCopied, handleAddressCopy] = useCopyToClipboard();
 
   const nftContractName = nftContracts.find(({ address: contractAddress }) =>
@@ -134,7 +148,19 @@ export default function NftDetails({ nft }) {
     history.push(SEND_ROUTE);
   };
 
-  const renderSendButton = () => {
+  const onLockToggle = useCallback(() => {
+    dispatch(
+      setAssetLock({
+        tokenAddress: address,
+        setLocked: !isLockedAsset,
+        tokenStandard: standard,
+        tokenId,
+        chainId: currentNetwork,
+      }),
+    );
+  }, [dispatch, address, tokenId, standard, isLockedAsset, currentNetwork]);
+
+  const renderActionButton = () => {
     if (isCurrentlyOwned === false) {
       return <div style={{ height: '30px' }} />;
     }
@@ -156,6 +182,15 @@ export default function NftDetails({ nft }) {
         {sendDisabled ? (
           <InfoTooltip position="top" contentText={t('sendingDisabled')} />
         ) : null}
+        {/* THIS IS THE WRONG COMPONENT FOR THIS BUTTON BUT PUTTING IT HERE NOW FOR AN EASY POC */}
+        <Button
+          type="primary"
+          onClick={onLockToggle}
+          className="nft-details__send-button"
+          data-testid="nft-send-button"
+        >
+          {isLockedAsset ? t('unlock') : t('lock')}
+        </Button>
       </Box>
     );
   };
@@ -241,7 +276,7 @@ export default function NftDetails({ nft }) {
                 </Text>
               </div>
             ) : null}
-            {inPopUp ? null : renderSendButton()}
+            {inPopUp ? null : renderActionButton()}
           </Box>
         </div>
         <Box marginBottom={2}>
@@ -418,7 +453,7 @@ export default function NftDetails({ nft }) {
               </Tooltip>
             </Box>
           </Box>
-          {inPopUp ? renderSendButton() : null}
+          {inPopUp ? renderActionButton() : null}
           <Text
             color={TextColor.textAlternative}
             variant={TextVariant.bodySm}
